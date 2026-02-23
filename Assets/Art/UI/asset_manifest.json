@@ -1,0 +1,231 @@
+{
+  "_generated_at": "2026-02-07 20:49:38",
+  "_tool": "comfyui_tools",
+  "assets": {
+    "timer": {
+      "type": "icon",
+      "size": [
+        32,
+        32
+      ],
+      "deploy_path": "Icons/timer.png",
+      "generated_at": "2026-02-07 20:47:08"
+    },
+    "orange_icon": {
+      "type": "icon",
+      "size": [
+        50,
+        50
+      ],
+      "deploy_path": "Icons/orange_icon.png",
+      "generated_at": "2026-02-07 20:47:21"
+    },
+    "gift": {
+      "type": "icon",
+      "size": [
+        32,
+        32
+      ],
+      "deploy_path": "Icons/gift.png",
+      "generated_at": "2026-02-07 20:47:26"
+    },
+    "duck": {
+      "type": "icon",
+      "size": [
+        32,
+        32
+      ],
+      "deploy_path": "Icons/duck.png",
+      "generated_at": "2026-02-07 20:47:31"
+    },
+    "close": {
+      "type": "icon",
+      "size": [
+        40,
+        40
+      ],
+      "deploy_path": "Icons/close.png",
+      "generated_at": "2026-02-07 20:47:37"
+    },
+    "camp_orange": {
+      "type": "icon",
+      "size": [
+        30,
+        30
+      ],
+      "deploy_path": "Icons/camp_orange.png",
+      "generated_at": "2026-02-07 20:47:42"
+    },
+    "camp_pomelo": {
+      "type": "icon",
+      "size": [
+        30,
+        30
+      ],
+      "deploy_path": "Icons/camp_pomelo.png",
+      "generated_at": "2026-02-07 20:47:47"
+    },
+    "ranking": {
+      "type": "icon",
+      "size": [
+        120,
+        40
+      ],
+      "deploy_path": "Icons/ranking.png",
+      "generated_at": "2026-02-07 20:47:52"
+    },
+    "pause": {
+      "type": "icon",
+      "size": [
+        48,
+        48
+      ],
+      "deploy_path": "Icons/pause.png",
+      "generated_at": "2026-02-07 20:47:57"
+    },
+    "resume": {
+      "type": "icon",
+      "size": [
+        48,
+        48
+      ],
+      "deploy_path": "Icons/resume.png",
+      "generated_at": "2026-02-07 20:48:03"
+    },
+    "tab_weekly": {
+      "type": "icon",
+      "size": [
+        100,
+        36
+      ],
+      "deploy_path": "Icons/tab_weekly.png",
+      "generated_at": "2026-02-07 20:48:08"
+    },
+    "tab_monthly": {
+      "type": "icon",
+      "size": [
+        100,
+        36
+      ],
+      "deploy_path": "Icons/tab_monthly.png",
+      "generated_at": "2026-02-07 20:48:13"
+    },
+    "tab_hourly": {
+      "type": "icon",
+      "size": [
+        100,
+        36
+      ],
+      "deploy_path": "Icons/tab_hourly.png",
+      "generated_at": "2026-02-07 20:48:18"
+    },
+    "crown_gold": {
+      "type": "icon",
+      "size": [
+        24,
+        24
+      ],
+      "deploy_path": "Icons/crown_gold.png",
+      "generated_at": "2026-02-07 20:48:23"
+    },
+    "crown_silver": {
+      "type": "icon",
+      "size": [
+        24,
+        24
+      ],
+      "deploy_path": "Icons/crown_silver.png",
+      "generated_at": "2026-02-07 20:48:28"
+    },
+    "crown_bronze": {
+      "type": "icon",
+      "size": [
+        24,
+        24
+      ],
+      "deploy_path": "Icons/crown_bronze.png",
+      "generated_at": "2026-02-07 20:48:34"
+    },
+    "vs": {
+      "type": "icon",
+      "size": [
+        100,
+        100
+      ],
+      "deploy_path": "Icons/vs.png",
+      "generated_at": "2026-02-07 20:48:39"
+    },
+    "progress_bar_bg": {
+      "type": "panel",
+      "size": [
+        900,
+        40
+      ],
+      "deploy_path": "Panels/progress_bar_bg.png",
+      "generated_at": "2026-02-07 20:48:45"
+    },
+    "progress_fill_left": {
+      "type": "panel",
+      "size": [
+        450,
+        36
+      ],
+      "deploy_path": "Panels/progress_fill_left.png",
+      "generated_at": "2026-02-07 20:48:50"
+    },
+    "progress_fill_right": {
+      "type": "panel",
+      "size": [
+        450,
+        36
+      ],
+      "deploy_path": "Panels/progress_fill_right.png",
+      "generated_at": "2026-02-07 20:48:53"
+    },
+    "ranking_panel_bg": {
+      "type": "panel",
+      "size": [
+        800,
+        600
+      ],
+      "deploy_path": "Panels/ranking_panel_bg.png",
+      "generated_at": "2026-02-07 20:49:01"
+    },
+    "toast_bg": {
+      "type": "panel",
+      "size": [
+        600,
+        60
+      ],
+      "deploy_path": "Panels/toast_bg.png",
+      "generated_at": "2026-02-07 20:49:04"
+    },
+    "player_list_item_bg": {
+      "type": "panel",
+      "size": [
+        780,
+        50
+      ],
+      "deploy_path": "Panels/player_list_item_bg.png",
+      "generated_at": "2026-02-07 20:49:08"
+    },
+    "bottom_bar_bg": {
+      "type": "panel",
+      "size": [
+        1080,
+        120
+      ],
+      "deploy_path": "Panels/bottom_bar_bg.png",
+      "generated_at": "2026-02-07 20:49:12"
+    },
+    "waiting_panel_bg": {
+      "type": "panel",
+      "size": [
+        600,
+        400
+      ],
+      "deploy_path": "Panels/waiting_panel_bg.png",
+      "generated_at": "2026-02-07 20:49:16"
+    }
+  }
+}

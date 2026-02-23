@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: mat_1001_dhxy_jz06b
+  m_Shader: {fileID: 10752, guid: 0000000000000000f000000000000000, type: 0}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 1
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: 4403d830e9bfa774fad019fcf60a3024, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Alpha: 1
+    - _Brightness: 1.59
+    - _BumpScaleST: 1
+    - _Cull: 2
+    - _Cutoff: 0.3
+    - _DissolveNoiseTexScale: 1
+    - _DissolveNoiseType: 0
+    - _DissolveRampType: 0
+    - _DissolveValue: 0
+    - _DstBlend: 0
+    - _EFFECTICE_NO_TEXTURE: 0
+    - _EffectIce: 0
+    - _EffectStream: 0
+    - _EmissionUseAlpha: 0
+    - _ExtraCubeMapEnable: 0
+    - _ExtraCubeMapIntensity: 0
+    - _FogFactor: 1
+    - _FogPixel: 0
+    - _FresnelPower: 0.1
+    - _IceFresnelStrength: 0.5
+    - _IceFresnelWidth: 0.5
+    - _IceMaskTexUvScale: 1
+    - _IceOpacity: 1
+    - _IceReflectionStrength: 20
+    - _LightMapLightEnabel: 1
+    - _LightMapLightIntensity: 1
+    - _LightMapLightRange: 1
+    - _LodQualityLow: 0
+    - _Metallic: 1
+    - _Mode: 0
+    - _RefFresnelBase: 0
+    - _RefFresnelIntensity: 1
+    - _RefFresnelPower: 1
+    - _RefFresnelUse: 0
+    - _ReflectBaseIntensity: 1
+    - _ReflectIntensity: 0
+    - _ReflectPower: 0.001
+    - _Reflection: 1
+    - _Roughness: 1
+    - _Smooth: 0.001
+    - _SpecStrength: 1
+    - _SrcBlend: 1
+    - _StreamColorFactor: 0
+    - _StreamFactor: 10
+    - _StreamOffsetX: 0.1
+    - _StreamOffsetY: 0.1
+    - _StreamTexFactor: 0
+    - _UV_ANIMATION: 0
+    - _ZWrite: 1
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _IceReflectColor: {r: 0.5, g: 0.6, b: 0.7, a: 1}
+    - _ReflectColor: {r: 0, g: 0, b: 0, a: 0}
+    - _RimColor: {r: 1, g: 1, b: 1, a: 1}
+    - _UVAnimationSpeed: {r: 0.1, g: 0.1, b: 0, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

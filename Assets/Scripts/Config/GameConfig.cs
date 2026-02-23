@@ -9,11 +9,15 @@ namespace CapybaraDuel.Config
     public class GameConfig : ScriptableObject
     {
         [Header("Server")]
-        public string serverUrl = "ws://localhost:8081";
-        public string httpUrl = "http://localhost:8080";
+        public string serverUrl = "wss://kpbl.jiuqian2025.com";
+        public string httpUrl = "https://kpbl.jiuqian2025.com";
         public float heartbeatInterval = 30f;
         public float reconnectDelay = 3f;
         public int maxReconnectAttempts = 5;
+
+        [Header("Room")]
+        [Tooltip("房间ID，对应抖音直播间ID。留空则使用 'default'（测试用）")]
+        public string roomId = "";
 
         [Header("Game")]
         public float gameDuration = 1800f; // 30分钟

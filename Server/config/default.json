@@ -5,9 +5,14 @@
     "heartbeatInterval": 30000
   },
   "game": {
-    "matchDuration": 1800,
-    "countdownWarning": 10,
+    "matchDuration": 3600,
+    "countdownWarning": 30,
     "maxCapybaraCount": 100
+  },
+  "room": {
+    "pauseTimeout": 1800000,
+    "cleanupInterval": 300000,
+    "maxRooms": 200
   },
   "camps": {
     "left": {
@@ -21,21 +26,10 @@
       "keywords": ["2", "222", "右", "柚子"]
     }
   },
-  "gifts": {
-    "duck": {
-      "id": "duck",
-      "name": "泡澡小黄鸭",
-      "price": 0.1,
-      "type": "upgrade"
-    },
-    "youzi": {
-      "id": "youzi",
-      "name": "柚子",
-      "price": 10,
-      "type": "summon",
-      "unitId": "3111_RunCapy",
-      "force": 343,
-      "duration": 30
-    }
+  "simulator": {
+    "joinInterval": 2000,
+    "giftInterval": 3000,
+    "joinProbability": 0.7,
+    "giftProbability": 0.5
   }
 }

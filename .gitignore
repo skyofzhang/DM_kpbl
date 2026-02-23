@@ -45,6 +45,20 @@ yarn-error.log
 *.unitypackage
 *.exe
 
+# Root node_modules (if any)
+node_modules/
+
+# Large video recordings (not game assets)
+资源补充/
+
 # Misc
 *.log
 session_context.json
+nul
+build_status.txt
+ui_screenshot.png
+extract_webp_frames.mjs
+
+# Large binary assets (videos) - track with description only
+# Assets/Art/VIPEntry/*.webm  # Kept: needed for VIP entry system
+# Assets/Resources/GiftAnimations/*.webm  # Kept: needed for gift animations
