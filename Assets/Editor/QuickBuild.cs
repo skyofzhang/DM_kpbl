@@ -8,13 +8,18 @@ using System.Linq;
 
 /// <summary>
 /// 一键打包脚本 — 通过Coplay execute_script调用
-/// 流程: 保存场景 → 编译检查 → 打包到上架目录
-/// 输出: Build/capybara_duel_1.0.0/capybara_duel.exe
+/// 流程: 保存场景 → IL2CPP加密 → 打包到上架目录
+/// 输出: Build/capybaraduel_1.0.4/capybaraduel.exe
+///
+/// v1.0.4变更:
+/// - 切换到IL2CPP后端（代码加密/混淆，防反编译）
+/// - 启用StripUnusedMeshComponents（减小包体）
+/// - 设置ManagedStrippingLevel为Medium（移除未使用的.NET代码）
 /// </summary>
 public class QuickBuild
 {
-    private const string GAME_NAME = "capybara_duel";
-    private const string VERSION = "1.0.1";
+    private const string GAME_NAME = "capybaraduel";
+    private const string VERSION = "1.0.4";
 
     [MenuItem("CapybaraDuel/Quick Build (保存+打包)", false, 201)]
     public static void MenuBuild()
@@ -40,7 +45,19 @@ public class QuickBuild
         }
 
         // ==============================
-        // Step 2: 确定输出目录（上架目录）
+        // Step 2: 设置打包后端 + 优化选项
+        // ==============================
+        // IL2CPP后端：代码编译为C++原生二进制，防止dnSpy反编译
+        PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, ScriptingImplementation.IL2CPP);
+        // 移除未使用的Mesh组件数据
+        PlayerSettings.stripUnusedMeshComponents = true;
+        // 中等裁剪：移除未使用的.NET代码，减小包体
+        PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.Minimal);
+
+        Debug.Log($"[QuickBuild] IL2CPP打包模式（代码加密，防反编译）");
+
+        // ==============================
+        // Step 3: 确定输出目录（上架目录）
         // ==============================
         string projectRoot = Directory.GetParent(Application.dataPath).FullName;
         string versionFolder = $"{GAME_NAME}_{VERSION}";
@@ -56,7 +73,7 @@ public class QuickBuild
         Directory.CreateDirectory(outputDir);
 
         // ==============================
-        // Step 3: 收集场景
+        // Step 4: 收集场景
         // ==============================
         string[] scenes = EditorBuildSettings.scenes
             .Where(s => s.enabled)
@@ -73,9 +90,9 @@ public class QuickBuild
         }
 
         // ==============================
-        // Step 4: 执行打包
+        // Step 5: 执行打包
         // ==============================
-        Debug.Log($"[QuickBuild] 开始打包... 场景: {string.Join(", ", scenes)}");
+        Debug.Log($"[QuickBuild] 开始打包(IL2CPP)... 场景: {string.Join(", ", scenes)}");
 
         var options = new BuildPlayerOptions
         {
@@ -97,7 +114,7 @@ public class QuickBuild
                 ? $"{exeSize / 1024 / 1024}MB"
                 : $"{exeSize / 1024}KB";
 
-            return $"SUCCESS: {versionFolder}/{GAME_NAME}.exe ({exeSizeStr}, total {sizeMB:F1}MB, errors: 0) | 场景: {string.Join(", ", scenes)}";
+            return $"SUCCESS: {versionFolder}/{GAME_NAME}.exe ({exeSizeStr}, total {sizeMB:F1}MB, errors: 0, IL2CPP) | 场景: {string.Join(", ", scenes)}";
         }
         else
         {

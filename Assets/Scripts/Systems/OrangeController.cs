@@ -114,6 +114,19 @@ namespace CapybaraDuel.Systems
         {
             _baseRotation = transform.rotation;
             _baseScale = transform.localScale;
+
+            // 强制确保关键视觉特性开启（防止场景序列化值覆盖）
+            enableRotation = true;
+            enableReversalFrenzy = true;
+            enableIdleSway = true;
+            enableBreathing = true;
+            enableForceWobble = true;
+            // 增强视觉可见度
+            if (swayAngle < 12f) swayAngle = 15f;        // 左右晃动幅度增大
+            if (swayFrequency < 0.4f) swayFrequency = 0.5f; // 晃动频率加快
+            if (baseSpinSpeed < 30f) baseSpinSpeed = 45f;  // 基础自转加快
+            if (breathScale < 0.04f) breathScale = 0.05f;  // 呼吸更明显
+            if (frenzySpinSpeed < 1200f) frenzySpinSpeed = 1500f; // 反推疯狂转更快
         }
 
         private float _prevVelocity = 0f; // 上一帧速度（用于加速度限制）
@@ -305,8 +318,8 @@ namespace CapybaraDuel.Systems
             if (enableIdleSway)
             {
                 _swayPhase += swayFrequency * 2f * Mathf.PI * Time.deltaTime;
-                // 移动越快微晃越小（移动时倾斜已经提供了动感）
-                float swayDampen = 1f - Mathf.Clamp01(speed / (maxSpeed * 0.3f));
+                // v116b: 保留最低30%晃动，高速时也有微晃（原公式speed>0.6时归零导致完全看不见）
+                float swayDampen = Mathf.Lerp(0.3f, 1f, 1f - Mathf.Clamp01(speed / (maxSpeed * 0.5f)));
                 swayZ = Mathf.Sin(_swayPhase) * swayAngle * swayDampen;
             }
 

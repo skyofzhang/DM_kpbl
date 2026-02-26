@@ -72,6 +72,14 @@ namespace CapybaraDuel.UI
             _chineseFont = Resources.Load<TMP_FontAsset>("Fonts/ChineseFont SDF");
             TrySubscribe();
 
+            // VIP入场视频层级=40，高于通知(10)和礼物(30)，低于TopBar(50)
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 40;
+            if (GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+                gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
             // 初始隐藏
             if (canvasGroup) canvasGroup.alpha = 0;
             if (backgroundOverlay) backgroundOverlay.enabled = false;
@@ -190,21 +198,27 @@ namespace CapybaraDuel.UI
             {
                 playDuration = isMonthly ? 11f : 14f;
                 var clip1 = isMonthly ? monthlyRank1Clip : weeklyRank1Clip;
+                #if UNITY_EDITOR
                 Debug.Log($"[VIP] GetEntryClip: type={vipType}, rank={vipRank}, clip={clip1?.name ?? "NULL"}, duration={playDuration}s");
+                #endif
                 return clip1;
             }
             if (vipRank == 2)
             {
                 playDuration = isMonthly ? 13f : 13f;
                 var clip2 = isMonthly ? monthlyRank2Clip : weeklyRank2Clip;
+                #if UNITY_EDITOR
                 Debug.Log($"[VIP] GetEntryClip: type={vipType}, rank={vipRank}, clip={clip2?.name ?? "NULL"}, duration={playDuration}s");
+                #endif
                 return clip2;
             }
             if (vipRank == 3)
             {
                 playDuration = isMonthly ? 9f : 11f;
                 var clip3 = isMonthly ? monthlyRank3Clip : weeklyRank3Clip;
+                #if UNITY_EDITOR
                 Debug.Log($"[VIP] GetEntryClip: type={vipType}, rank={vipRank}, clip={clip3?.name ?? "NULL"}, duration={playDuration}s");
+                #endif
                 return clip3;
             }
 
@@ -212,25 +226,33 @@ namespace CapybaraDuel.UI
             {
                 playDuration = isMonthly ? 6f : 6f;  // 非Top3缩短2秒 (8→6)
                 var clip4 = isMonthly ? monthlyRank4_10Clip : weeklyRank4_10Clip;
+                #if UNITY_EDITOR
                 Debug.Log($"[VIP] GetEntryClip: type={vipType}, rank={vipRank}, clip={clip4?.name ?? "NULL"}, duration={playDuration}s");
+                #endif
                 return clip4;
             }
             if (vipRank >= 11 && vipRank <= 20)
             {
                 playDuration = isMonthly ? 5f : 7f;  // 非Top3缩短2秒 (7→5, 9→7)
                 var clip11 = isMonthly ? monthlyRank11_20Clip : weeklyRank11_20Clip;
+                #if UNITY_EDITOR
                 Debug.Log($"[VIP] GetEntryClip: type={vipType}, rank={vipRank}, clip={clip11?.name ?? "NULL"}, duration={playDuration}s");
+                #endif
                 return clip11;
             }
 
+            #if UNITY_EDITOR
             Debug.Log($"[VIP] GetEntryClip: type={vipType}, rank={vipRank} → no clip (out of range)");
+            #endif
             return null;
         }
 
         /// <summary>播放入场视频（maxDuration控制最大播放秒数，到时自动关闭）</summary>
         private void PlayEntryVideo(VideoClip clip, PlayerJoinedData data, float maxDuration = 15f)
         {
+            #if UNITY_EDITOR
             Debug.Log($"[VIP] PlayEntryVideo: clip={clip?.name ?? "NULL"}, player={data.playerName}, maxDuration={maxDuration}s");
+            #endif
             _currentVideoMaxDuration = maxDuration;
             if (videoDisplay == null)
             {

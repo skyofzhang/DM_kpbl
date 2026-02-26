@@ -19,7 +19,7 @@ namespace CapybaraDuel.UI
         public Transform container;
         public float displayDuration = 2.2f;
         public float slideSpeed = 0.3f;
-        public int maxVisible = 3;
+        public int maxVisible = 2;
 
         private Queue<JoinData> _pendingQueue = new Queue<JoinData>();
         private List<GameObject> _active = new List<GameObject>();
@@ -32,12 +32,15 @@ namespace CapybaraDuel.UI
         private Dictionary<string, float> _recentJoins = new Dictionary<string, float>();
         private const float DEDUP_WINDOW = 5f; // 5秒内同一玩家不重复显示
 
-        // 阵营底色（半透明）
-        private static readonly Color COL_LEFT_BG = new Color(1f, 0.5f, 0f, 0.75f);
-        private static readonly Color COL_RIGHT_BG = new Color(0.45f, 0.82f, 0.12f, 0.75f);
+        // 阵营底色（渐变感：中心浓+边缘淡+内发光）
+        private static readonly Color COL_LEFT_BG = new Color(0.85f, 0.35f, 0f, 0.85f);
+        private static readonly Color COL_RIGHT_BG = new Color(0.2f, 0.65f, 0.05f, 0.85f);
+        // 边框色（比底色亮）
+        private static readonly Color COL_LEFT_BORDER = new Color(1f, 0.65f, 0.2f, 0.9f);
+        private static readonly Color COL_RIGHT_BORDER = new Color(0.5f, 0.9f, 0.3f, 0.9f);
         // 阵营名文字色
-        private static readonly Color COL_LEFT_CAMP = new Color(1f, 0.75f, 0.3f);
-        private static readonly Color COL_RIGHT_CAMP = new Color(0.6f, 1f, 0.35f);
+        private static readonly Color COL_LEFT_CAMP = new Color(1f, 0.85f, 0.5f);
+        private static readonly Color COL_RIGHT_CAMP = new Color(0.75f, 1f, 0.5f);
 
         private struct JoinData
         {
@@ -47,6 +50,14 @@ namespace CapybaraDuel.UI
 
         private void Start()
         {
+            // 通知层级：最低层，不遮挡入场视频(40)和礼物(30)
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 10;
+            if (GetComponent<GraphicRaycaster>() == null)
+                gameObject.AddComponent<GraphicRaycaster>();
+
             _chineseFont = Resources.Load<TMP_FontAsset>("Fonts/ChineseFont SDF");
             if (container == null) container = transform;
             TrySubscribe();
@@ -68,10 +79,30 @@ namespace CapybaraDuel.UI
             }
         }
 
+        private void OnDisable()
+        {
+            // 状态切换时清空队列，防止结算/主菜单还在播放通知
+            ClearAll();
+        }
+
         private void OnDestroy()
         {
             if (_campSystem != null)
                 _campSystem.OnPlayerJoined -= HandlePlayerJoined;
+        }
+
+        /// <summary>立即清空所有通知和队列</summary>
+        public void ClearAll()
+        {
+            _pendingQueue.Clear();
+            _isProcessing = false;
+            StopAllCoroutines();
+            foreach (var go in _active)
+                if (go != null) Destroy(go);
+            _active.Clear();
+            foreach (var go in _pool)
+                if (go != null) Destroy(go);
+            _pool.Clear();
         }
 
         private void HandlePlayerJoined(string playerId, string playerName, string camp)
@@ -93,6 +124,10 @@ namespace CapybaraDuel.UI
                 foreach (var k in expired) _recentJoins.Remove(k);
             }
 
+            // v116b: 队列上限，大量玩家同时加入时只显示前几条，避免弹数分钟
+            const int MAX_PENDING = 5;
+            if (_pendingQueue.Count >= MAX_PENDING) return;
+
             _pendingQueue.Enqueue(new JoinData { playerName = playerName, camp = camp });
             if (!_isProcessing)
                 StartCoroutine(ProcessQueue());
@@ -107,6 +142,12 @@ namespace CapybaraDuel.UI
             _isProcessing = true;
             while (_pendingQueue.Count > 0)
             {
+                // v116: 非Running状态立即清空退出，防止主菜单/结算时还在弹通知
+                if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameManager.GameState.Running)
+                {
+                    ClearAll();
+                    yield break;
+                }
                 while (_active.Count >= maxVisible && _active.Count > 0)
                 {
                     var oldest = _active[0];
@@ -141,12 +182,53 @@ namespace CapybaraDuel.UI
             totalWidth = Mathf.Clamp(totalWidth, 300f, 580f);
             rt.sizeDelta = new Vector2(totalWidth, 50);
 
-            // === 底图 ===
+            Color borderColor = isLeft ? COL_LEFT_BORDER : COL_RIGHT_BORDER;
+
+            // === 外层边框（亮色细边） ===
             var bgImg = go.GetComponent<Image>();
             if (bgImg == null) bgImg = go.AddComponent<Image>();
             bgImg.enabled = true;
-            bgImg.color = bgColor;
+            bgImg.color = borderColor;
             bgImg.raycastTarget = false;
+
+            // === 内层底色（比外框小2px，形成边框效果） ===
+            var innerGo = new GameObject("InnerBg", typeof(RectTransform));
+            innerGo.transform.SetParent(go.transform, false);
+            var innerRT = innerGo.GetComponent<RectTransform>();
+            innerRT.anchorMin = Vector2.zero;
+            innerRT.anchorMax = Vector2.one;
+            innerRT.offsetMin = new Vector2(2, 2);
+            innerRT.offsetMax = new Vector2(-2, -2);
+            var innerImg = innerGo.AddComponent<Image>();
+            innerImg.color = bgColor;
+            innerImg.raycastTarget = false;
+
+            // === 内发光高光线（顶部，阵营色调） ===
+            Color glowColor = isLeft
+                ? new Color(1f, 0.85f, 0.5f, 0.18f)   // 暖光
+                : new Color(0.6f, 1f, 0.5f, 0.18f);   // 冷光
+            var glowGo = new GameObject("TopGlow", typeof(RectTransform));
+            glowGo.transform.SetParent(innerGo.transform, false);
+            var glowRT = glowGo.GetComponent<RectTransform>();
+            glowRT.anchorMin = new Vector2(0.04f, 0.82f);
+            glowRT.anchorMax = new Vector2(0.96f, 1f);
+            glowRT.offsetMin = Vector2.zero;
+            glowRT.offsetMax = Vector2.zero;
+            var glowImg = glowGo.AddComponent<Image>();
+            glowImg.color = glowColor;
+            glowImg.raycastTarget = false;
+
+            // === 底部微光线（增加层次） ===
+            var botGlow = new GameObject("BottomGlow", typeof(RectTransform));
+            botGlow.transform.SetParent(innerGo.transform, false);
+            var botGlowRT = botGlow.GetComponent<RectTransform>();
+            botGlowRT.anchorMin = new Vector2(0.1f, 0f);
+            botGlowRT.anchorMax = new Vector2(0.9f, 0.1f);
+            botGlowRT.offsetMin = Vector2.zero;
+            botGlowRT.offsetMax = Vector2.zero;
+            var botGlowImg = botGlow.AddComponent<Image>();
+            botGlowImg.color = new Color(glowColor.r, glowColor.g, glowColor.b, 0.06f);
+            botGlowImg.raycastTarget = false;
 
             // === 左渐变边 ===
             CreateFadeEdge(go.transform, true, bgColor);
@@ -170,6 +252,23 @@ namespace CapybaraDuel.UI
             hlg.childControlWidth = true;
             hlg.childControlHeight = true;
 
+            // === 阵营符号（TMP兼容Unicode） ===
+            string cBdr = ColorUtility.ToHtmlStringRGB(borderColor);
+            string campSymbol = isLeft ? $"<color=#{cBdr}>\u25ba</color>" : $"<color=#{cBdr}>\u25c4</color>";  // ► / ◄
+            var symbolGo = new GameObject("Symbol", typeof(RectTransform));
+            symbolGo.transform.SetParent(textContainer.transform, false);
+            var symbolTMP = symbolGo.AddComponent<TextMeshProUGUI>();
+            symbolTMP.text = campSymbol;
+            symbolTMP.richText = true;
+            symbolTMP.fontSize = 22;
+            symbolTMP.alignment = TextAlignmentOptions.Center;
+            symbolTMP.enableWordWrapping = false;
+            symbolTMP.raycastTarget = false;
+            if (_chineseFont != null) symbolTMP.font = _chineseFont;
+            var symbolLE = symbolGo.AddComponent<LayoutElement>();
+            symbolLE.preferredWidth = 28;
+            symbolLE.flexibleWidth = 0;
+
             // === 玩家名 (大号粗体白色) ===
             var nameGo = new GameObject("Name", typeof(RectTransform));
             nameGo.transform.SetParent(textContainer.transform, false);
@@ -187,11 +286,12 @@ namespace CapybaraDuel.UI
             nameLE.preferredWidth = nameWidth;
             nameLE.flexibleWidth = 1;
 
-            // === 加入文字 (常规, 阵营色) ===
+            // === 加入文字 (常规, 阵营色, 带符号) ===
+            string campDot = isLeft ? "<color=#FF8800>\u25c6</color>" : "<color=#66DD22>\u25c6</color>"; // ◆
             var joinGo = new GameObject("JoinText", typeof(RectTransform));
             joinGo.transform.SetParent(textContainer.transform, false);
             var joinTMP = joinGo.AddComponent<TextMeshProUGUI>();
-            joinTMP.text = $"加入了 <b>{campName}</b>";
+            joinTMP.text = $"\u52a0\u5165 <b>{campName}</b> {campDot}";
             joinTMP.fontSize = 20;
             joinTMP.richText = true;
             joinTMP.color = campColor;
@@ -200,7 +300,7 @@ namespace CapybaraDuel.UI
             if (_chineseFont != null) joinTMP.font = _chineseFont;
             ApplyUnderlayLight(joinTMP);
             var joinLE = joinGo.AddComponent<LayoutElement>();
-            joinLE.preferredWidth = 170;
+            joinLE.preferredWidth = 195;
 
             // ====== 滑入动画 ======
             float yPos = -450f - _active.Count * 58f;

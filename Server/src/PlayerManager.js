@@ -259,10 +259,22 @@ class PlayerManager {
    * @param {string} playerId
    * @param {number} contribution - 贡献分（基于推力值，非金额）
    * @param {number} [force=0] - 本次推力值（用于per-player推力显示）
+   * @param {string} [source='gift'] - 来源: 'gift'(无上限), 'like'(max10次/局), 'boost'(max5次/局), 'join'(天然1次)
    */
-  addContribution(playerId, contribution, force = 0) {
+  addContribution(playerId, contribution, force = 0, source = 'gift') {
     const player = this.players.get(playerId);
     if (!player) return;
+
+    // v116: 免费来源单局贡献上限（推力force不受影响，只限contribution）
+    if (source === 'like') {
+      player.likeContribCount = (player.likeContribCount || 0) + 1;
+      if (player.likeContribCount > 10) contribution = 0; // 超过10次点赞不再加贡献
+    } else if (source === 'boost') {
+      player.boostContribCount = (player.boostContribCount || 0) + 1;
+      if (player.boostContribCount > 5) contribution = 0; // 超过5次666不再加贡献
+    }
+    // source === 'gift' 无上限, source === 'join' 天然每人1次
+
     player.contribution += contribution;
     if (force > 0) player.totalForce += force;
 
@@ -542,6 +554,7 @@ class PlayerManager {
       this._ensurePeriodFields(stats);
       stats.weeklyScore += p.contribution;
       stats.monthlyScore += p.contribution;
+      this._invalidateVipRankCache(); // 分数变更→失效VIP排名缓存
 
       if (p.camp === winner) {
         // === 胜方 ===
@@ -744,33 +757,51 @@ class PlayerManager {
    * @param {string} playerId
    * @returns {null | { isVip: boolean, vipRank: number, vipTitle: string, vipType: string }}
    */
+  /**
+   * 性能优化：VIP排名缓存（原实现每次加入遍历全部玩家O(n)×2，150人场景=22500次比较）
+   * 新实现：缓存排名Map，5秒TTL，查找O(1)
+   */
+  _ensureVipRankCache() {
+    const now = Date.now();
+    if (this._vipRankCache && now - this._vipRankCacheTime < 5000) return;
+
+    const weeklyMap = new Map();
+    const monthlyMap = new Map();
+
+    // 单次遍历收集所有分数
+    const weeklyEntries = [];
+    const monthlyEntries = [];
+    for (const [id, s] of this.playerStats) {
+      this._ensurePeriodFields(s);
+      if (s.weeklyScore > 0) weeklyEntries.push([id, s.weeklyScore]);
+      if (s.monthlyScore > 0) monthlyEntries.push([id, s.monthlyScore]);
+    }
+
+    // 排序+赋排名（各只排一次）
+    weeklyEntries.sort((a, b) => b[1] - a[1]);
+    weeklyEntries.forEach(([id], i) => weeklyMap.set(id, i + 1));
+
+    monthlyEntries.sort((a, b) => b[1] - a[1]);
+    monthlyEntries.forEach(([id], i) => monthlyMap.set(id, i + 1));
+
+    this._vipRankCache = { weeklyMap, monthlyMap };
+    this._vipRankCacheTime = now;
+  }
+
+  /** 使分数变更时主动失效缓存 */
+  _invalidateVipRankCache() {
+    this._vipRankCache = null;
+  }
+
   getVipInfo(playerId) {
     const stats = this.playerStats.get(playerId);
     if (!stats) return null;
 
     this._ensurePeriodFields(stats);
+    this._ensureVipRankCache();
 
-    // 计算周榜排名
-    let weeklyRank = 0;
-    if (stats.weeklyScore > 0) {
-      let higher = 0;
-      for (const [, s] of this.playerStats) {
-        this._ensurePeriodFields(s);
-        if (s.weeklyScore > stats.weeklyScore) higher++;
-      }
-      weeklyRank = higher + 1; // 1-based
-    }
-
-    // 计算月榜排名
-    let monthlyRank = 0;
-    if (stats.monthlyScore > 0) {
-      let higher = 0;
-      for (const [, s] of this.playerStats) {
-        this._ensurePeriodFields(s);
-        if (s.monthlyScore > stats.monthlyScore) higher++;
-      }
-      monthlyRank = higher + 1;
-    }
+    const weeklyRank = this._vipRankCache.weeklyMap.get(playerId) || 0;
+    const monthlyRank = this._vipRankCache.monthlyMap.get(playerId) || 0;
 
     // 取最佳排名（周榜或月榜，哪个排名更高用哪个）
     let vipRank = 0;
@@ -806,31 +837,28 @@ class PlayerManager {
       this._ensurePeriodFields(s);
     }
 
-    // 预排序各榜单，构建 playerId→rank 映射（一次排序，多次O(1)查找）
-    const weeklyRankMap = new Map();
-    [...allStats]
-      .filter(([, s]) => s.weeklyScore > 0)
-      .sort((a, b) => b[1].weeklyScore - a[1].weeklyScore)
-      .forEach(([id], i) => weeklyRankMap.set(id, i + 1));
-
-    const monthlyRankMap = new Map();
-    [...allStats]
-      .filter(([, s]) => s.monthlyScore > 0)
-      .sort((a, b) => b[1].monthlyScore - a[1].monthlyScore)
-      .forEach(([id], i) => monthlyRankMap.set(id, i + 1));
-
-    const streakRankMap = new Map();
-    [...allStats]
-      .filter(([, s]) => (s.currentStreak || 0) > 0)
-      .sort((a, b) => (b[1].currentStreak || 0) - (a[1].currentStreak || 0))
-      .forEach(([id], i) => streakRankMap.set(id, i + 1));
-
+    // 性能优化：单次遍历收集4个榜单数据，各排序1次（原4次spread+filter+sort→4次sort）
     const oneHourAgo = Date.now() - 3600000;
-    const hourlyRankMap = new Map();
-    [...allStats]
-      .filter(([, s]) => s.lastActive > oneHourAgo)
-      .sort((a, b) => b[1].totalScore - a[1].totalScore)
-      .forEach(([id], i) => hourlyRankMap.set(id, i + 1));
+    const weeklyArr = [], monthlyArr = [], streakArr = [], hourlyArr = [];
+
+    for (const [id, s] of allStats) {
+      if (s.weeklyScore > 0) weeklyArr.push([id, s.weeklyScore]);
+      if (s.monthlyScore > 0) monthlyArr.push([id, s.monthlyScore]);
+      if ((s.currentStreak || 0) > 0) streakArr.push([id, s.currentStreak]);
+      if (s.lastActive > oneHourAgo) hourlyArr.push([id, s.totalScore]);
+    }
+
+    const buildRankMap = (arr) => {
+      arr.sort((a, b) => b[1] - a[1]);
+      const map = new Map();
+      arr.forEach(([id], i) => map.set(id, i + 1));
+      return map;
+    };
+
+    const weeklyRankMap = buildRankMap(weeklyArr);
+    const monthlyRankMap = buildRankMap(monthlyArr);
+    const streakRankMap = buildRankMap(streakArr);
+    const hourlyRankMap = buildRankMap(hourlyArr);
 
     // 遍历当局玩家，组装完整数据
     const result = [];

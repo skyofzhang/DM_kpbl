@@ -1,0 +1,19 @@
+<linker>
+    <!-- 防止IL2CPP裁剪掉通过反射使用的类 -->
+
+    <!-- Unity JSON序列化需要 -->
+    <assembly fullname="System.Runtime.Serialization" preserve="all"/>
+
+    <!-- WebSocket通信需要 -->
+    <assembly fullname="System.Net.WebSockets" preserve="all"/>
+    <assembly fullname="System.Net.WebSockets.Client" preserve="all"/>
+
+    <!-- TextMeshPro需要 -->
+    <assembly fullname="Unity.TextMeshPro" preserve="all"/>
+
+    <!-- VideoPlayer需要 -->
+    <assembly fullname="UnityEngine.VideoModule" preserve="all"/>
+
+    <!-- 保留项目代码（防止public API被裁剪） -->
+    <assembly fullname="Assembly-CSharp" preserve="all"/>
+</linker>

@@ -36,8 +36,8 @@ namespace CapybaraDuel.VFX
         [SerializeField] private float trailWidthRatio = 0.4f;
 
         [Header("Colors")]
-        [SerializeField] private Color dustColorStart = new Color(0.82f, 0.72f, 0.55f, 0.55f);
-        [SerializeField] private Color dustColorEnd = new Color(0.65f, 0.55f, 0.4f, 0f);
+        [SerializeField] private Color dustColorStart = new Color(0.98f, 0.95f, 0.88f, 0.45f);  // 近白色+微暖
+        [SerializeField] private Color dustColorEnd = new Color(0.88f, 0.85f, 0.78f, 0f);        // 淡灰白消散
 
         [Header("Material")]
         [Tooltip("URP粒子材质，由SceneUpdater自动wire")]
@@ -95,13 +95,14 @@ namespace CapybaraDuel.VFX
             var gradient = new Gradient();
             gradient.SetKeys(
                 new[] {
-                    new GradientColorKey(dustColorStart, 0f),
-                    new GradientColorKey(dustColorEnd, 1f)
+                    new GradientColorKey(new Color(1f, 1f, 0.97f), 0f),       // 纯白色起始
+                    new GradientColorKey(new Color(0.96f, 0.9f, 0.78f), 0.35f),  // 中段微暖黄
+                    new GradientColorKey(dustColorEnd, 1f)                     // 淡灰白消散
                 },
                 new[] {
                     new GradientAlphaKey(0f, 0f),
                     new GradientAlphaKey(dustColorStart.a, 0.1f),
-                    new GradientAlphaKey(dustColorStart.a * 0.6f, 0.4f),
+                    new GradientAlphaKey(dustColorStart.a * 0.5f, 0.4f),
                     new GradientAlphaKey(0f, 1f)
                 }
             );

@@ -13,8 +13,9 @@ namespace CapybaraDuel.UI
     /// <summary>
     /// 礼物动画UI - 收到礼物时弹出WebM透明视频动画
     ///
-    /// 素材: Assets/Art/GiftGifs/tier{N}-sp.webm (VP8 + Alpha)
-    /// VideoClip通过tierVideoClips数组在Inspector中拖入
+    /// 每个tier支持1~4个视频变体，每次随机播放其中一个，避免大量刷礼物动画完全重叠
+    /// 素材: Assets/Art/GiftGifs/ (VP8 + Alpha WebM)
+    /// VideoClip通过tier{N}Clips数组在Inspector中拖入（支持多个变体）
     ///
     /// 不做队列，多个礼物同时显示，超过上限移除最早的
     /// </summary>
@@ -34,13 +35,27 @@ namespace CapybaraDuel.UI
         [Tooltip("tier3(52抖币)")]
         [SerializeField] private float tier3Height = 1400f;
         [Tooltip("tier4(99抖币)")]
-        [SerializeField] private float tier4Height = 1600f;
+        [SerializeField] private float tier4Height = 1350f;
         [Tooltip("tier5(199抖币)")]
-        [SerializeField] private float tier5Height = 1800f;
+        [SerializeField] private float tier5Height = 1500f;
         [Tooltip("tier6(520抖币) 最贵最大")]
-        [SerializeField] private float tier6Height = 2000f;
+        [SerializeField] private float tier6Height = 1700f;
 
-        [Header("Video Clips (tier1~tier6, Inspector中拖入WebM)")]
+        [Header("Video Clip Variants (每tier支持多个变体，随机播放)")]
+        [Tooltip("Tier1 仙女棒 — 拖入1~4个WebM变体")]
+        [SerializeField] private VideoClip[] tier1Clips = new VideoClip[0];
+        [Tooltip("Tier2 能力药丸")]
+        [SerializeField] private VideoClip[] tier2Clips = new VideoClip[0];
+        [Tooltip("Tier3 甜甜圈")]
+        [SerializeField] private VideoClip[] tier3Clips = new VideoClip[0];
+        [Tooltip("Tier4 能量电池")]
+        [SerializeField] private VideoClip[] tier4Clips = new VideoClip[0];
+        [Tooltip("Tier5 爱的爆炸")]
+        [SerializeField] private VideoClip[] tier5Clips = new VideoClip[0];
+        [Tooltip("Tier6 神秘空投")]
+        [SerializeField] private VideoClip[] tier6Clips = new VideoClip[0];
+
+        [Header("Legacy (向后兼容: 新数组为空时使用此数组)")]
         [SerializeField] private VideoClip[] tierVideoClips = new VideoClip[6];
 
         // 活跃动画实例
@@ -66,6 +81,15 @@ namespace CapybaraDuel.UI
         {
             if (animationContainer == null)
                 animationContainer = GetComponent<RectTransform>();
+
+            // 礼物动画层级=30，高于通知(20)，低于TopBar(50)
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 30;
+            if (GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+                gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
             TrySubscribe();
         }
 
@@ -131,6 +155,43 @@ namespace CapybaraDuel.UI
                 a.renderTexture.Release();
         }
 
+        // ==================== 视频变体选择 ====================
+
+        /// <summary>
+        /// 获取指定tier的随机VideoClip变体
+        /// 优先从tier{N}Clips数组中随机选择，为空时回退到旧tierVideoClips
+        /// </summary>
+        private VideoClip GetRandomClipForTier(int tier)
+        {
+            VideoClip[] variants = tier switch
+            {
+                1 => tier1Clips,
+                2 => tier2Clips,
+                3 => tier3Clips,
+                4 => tier4Clips,
+                5 => tier5Clips,
+                6 => tier6Clips,
+                _ => null
+            };
+
+            // 过滤掉null元素
+            if (variants != null && variants.Length > 0)
+            {
+                var valid = new List<VideoClip>();
+                foreach (var v in variants)
+                    if (v != null) valid.Add(v);
+                if (valid.Count > 0)
+                    return valid[Random.Range(0, valid.Count)];
+            }
+
+            // 回退到旧数组
+            int clipIdx = Mathf.Clamp(tier - 1, 0, 5);
+            if (tierVideoClips != null && clipIdx < tierVideoClips.Length)
+                return tierVideoClips[clipIdx];
+
+            return null;
+        }
+
         // ==================== 礼物触发 ====================
 
         private void OnGiftReceived(GiftReceivedData gift)
@@ -172,10 +233,8 @@ namespace CapybaraDuel.UI
                 _ => tier6Height
             };
 
-            // 根据视频实际宽高比计算宽度，避免拉伸
-            int clipIdx = Mathf.Clamp(tier - 1, 0, 5);
-            VideoClip clip = (tierVideoClips != null && clipIdx < tierVideoClips.Length)
-                ? tierVideoClips[clipIdx] : null;
+            // 随机选择视频变体
+            VideoClip clip = GetRandomClipForTier(tier);
 
             float aspectRatio = 1f; // 默认1:1
             if (clip != null && clip.height > 0)
@@ -185,13 +244,19 @@ namespace CapybaraDuel.UI
             float screenH = animationContainer.rect.height > 0
                 ? animationContainer.rect.height / 0.4f  // 容器占屏幕40%，反推全屏高度
                 : 1920f;
-            // 动画底部贴近容器底部，顶部不能超过屏幕顶部
-            // yPos ≈ size.y * 0.15，顶部 ≈ yPos + size.y/2 = size.y * 0.65
-            // 需要 size.y * 0.65 < screenH → size.y < screenH / 0.65
             float maxH = screenH / 0.65f;
             float finalHeight = Mathf.Min(baseHeight, maxH);
 
             Vector2 size = new Vector2(finalHeight * aspectRatio, finalHeight);
+
+            // 限制最大宽度：防止宽比例视频（如tier5-V1）撑爆画面
+            float maxWidth = (animationContainer.rect.width > 0 ? animationContainer.rect.width : 1080f) * 0.75f;
+            if (size.x > maxWidth)
+            {
+                float widthScale = maxWidth / size.x;
+                size = new Vector2(maxWidth, finalHeight * widthScale);
+            }
+
             rt.sizeDelta = size;
 
             // 位置：根据阵营从左/右侧弹出
@@ -207,8 +272,6 @@ namespace CapybaraDuel.UI
             rt.anchoredPosition = new Vector2(xPos, yPos);
 
             // === VideoPlayer + RawImage ===
-            // clip和clipIdx已在上方计算尺寸时获取
-
             RenderTexture renderTex = null;
             VideoPlayer vp = null;
 
@@ -234,9 +297,6 @@ namespace CapybaraDuel.UI
                 var rawImg = rawImgGo.AddComponent<RawImage>();
                 rawImg.texture = renderTex;
                 rawImg.raycastTarget = false;
-
-                // 确保RawImage使用支持Alpha透明的材质
-                // 默认UI/Default shader支持Alpha，但需要确认color.a=1
                 rawImg.color = Color.white;
 
                 // VideoPlayer
@@ -249,7 +309,7 @@ namespace CapybaraDuel.UI
                 vp.audioOutputMode = VideoAudioOutputMode.None;
                 vp.skipOnDrop = true;
 
-                // VP9 Alpha: 确保RenderTexture在播放前清空为透明
+                // 确保RenderTexture在播放前清空为透明
                 RenderTexture prev = RenderTexture.active;
                 RenderTexture.active = renderTex;
                 GL.Clear(true, true, Color.clear);
@@ -294,7 +354,7 @@ namespace CapybaraDuel.UI
                 txt.color = Color.white;
             }
 
-            // === 玩家信息（头像+名字，视频下方居中） ===
+            // === 玩家信息（头像+名字，视频中部偏上） ===
             CreatePlayerInfoOverlay(go.transform, gift, tier, size);
 
             // === 注册实例 ===
@@ -311,10 +371,8 @@ namespace CapybaraDuel.UI
             _activeAnims.Add(inst);
 
             // === 右侧阵营镜像翻转 ===
-            // 对视频容器水平镜像（localScale.x = -1），但玩家信息不翻转
             if (camp == "right")
             {
-                // 找到 VideoDisplay 或 Fallback 子对象，只翻转视频部分
                 for (int ci = 0; ci < go.transform.childCount; ci++)
                 {
                     var child = go.transform.GetChild(ci);
@@ -333,8 +391,8 @@ namespace CapybaraDuel.UI
         // ==================== 玩家信息 ====================
 
         /// <summary>
-        /// 在礼物动画底部创建玩家信息条（头像 + 名字 + 礼物名 + 推力）
-        /// 替代原GiftNotificationUI的底部文字通知，信息合并到动画弹窗中
+        /// 在礼物动画中部偏上创建玩家信息条（头像 + 名字 + 礼物名 + 推力）
+        /// 位置从原来的25%高度处上移到35%，更靠近视频中心
         /// </summary>
         private void CreatePlayerInfoOverlay(Transform parent, GiftReceivedData gift, int tier, Vector2 parentSize)
         {
@@ -352,9 +410,9 @@ namespace CapybaraDuel.UI
             var outerGo = new GameObject("PlayerInfoOuter", typeof(RectTransform));
             outerGo.transform.SetParent(parent, false);
             var outerRT = outerGo.GetComponent<RectTransform>();
-            // 锚定在视频中下部（约30%高度处），覆盖在视频上
-            outerRT.anchorMin = new Vector2(0.5f, 0.25f);
-            outerRT.anchorMax = new Vector2(0.5f, 0.25f);
+            // 锚定在视频中部偏上（约35%高度处），比原来的25%上移了一些
+            outerRT.anchorMin = new Vector2(0.5f, 0.35f);
+            outerRT.anchorMax = new Vector2(0.5f, 0.35f);
             outerRT.pivot = new Vector2(0.5f, 0.5f);
             outerRT.sizeDelta = new Vector2(0f, 0f);
             outerRT.anchoredPosition = new Vector2(0f, 0f);
@@ -445,7 +503,7 @@ namespace CapybaraDuel.UI
 
             // --- 名字 + 礼物名 合并显示 ---
             string giftName = string.IsNullOrEmpty(gift.giftName) ? "" : gift.giftName;
-            string countStr = gift.giftCount > 1 ? $"×{gift.giftCount}" : "";
+            string countStr = gift.giftCount > 1 ? $"\u00d7{gift.giftCount}" : "";
             string infoLine = $"{displayName} {giftName}{countStr}";
 
             var nameGo = new GameObject("PlayerName", typeof(RectTransform));
@@ -476,9 +534,9 @@ namespace CapybaraDuel.UI
 
                 var forceText = row2Go.AddComponent<TextMeshProUGUI>();
                 string forceStr = gift.forceValue >= 1000
-                    ? $"+{gift.forceValue / 1000f:F1}K推力"
-                    : $"+{gift.forceValue:F0}推力";
-                if (gift.isSummon) forceStr += " ★召唤";
+                    ? $"+{gift.forceValue / 1000f:F1}K\u63a8\u529b"
+                    : $"+{gift.forceValue:F0}\u63a8\u529b";
+                if (gift.isSummon) forceStr += " \u2605\u53ec\u5524";
                 forceText.text = forceStr;
                 forceText.fontSize = 20;
                 forceText.fontStyle = FontStyles.Bold;

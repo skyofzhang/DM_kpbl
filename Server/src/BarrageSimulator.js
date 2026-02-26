@@ -2,9 +2,17 @@
  * 弹幕模拟器
  * 自动生成假弹幕/礼物事件用于测试
  *
- * 默认模式(start): 轮流送礼测试（3~5秒间隔，低级→高级循环6种礼物）
- * 展示模式(startShowcase): 6种礼物轮流送，间隔5秒
- * 审核演示(startReviewDemo): 完整功能覆盖，按时间线编排，适合录屏提交审核
+ * 默认模式(start):          轮流送礼测试（3~5秒间隔，低级→高级循环，最多40人）
+ * 展示模式(startShowcase):   6种礼物轮流送，间隔5秒
+ * 审核演示(startReviewDemo): 完整功能覆盖，300人时间线，适合录屏提交审核
+ * 密集展示(startDenseShowcase): 宣传片专用 — 100人5秒入场 + 持续500ms/个送礼
+ *
+ * toggle_sim 参数:
+ *   { enabled: true, review: true }  → 审核演示
+ *   { enabled: true, dense: true }   → 密集展示（宣传片）
+ *   { enabled: true, showcase: true }→ 展示模式
+ *   { enabled: true }                → 默认模式
+ *   { enabled: false }               → 停止
  */
 
 const { getRandomGiftId, getGift } = require('./GiftConfig');
@@ -35,9 +43,9 @@ class BarrageSimulator {
     // roomCallbacks = { handleComment, handleLike }
     this.roomCallbacks = roomCallbacks || {};
 
-    // 100个固定假人池：保证跨局同一批ID，数据可追溯
+    // 300个固定假人池：保证跨局同一批ID，数据可追溯（支持150/侧性能测试）
     this.playerPool = [];
-    this._initFixedPlayerPool(100);
+    this._initFixedPlayerPool(300);
 
     // 轮流送礼索引（默认模式和展示模式共用）
     this.giftCycleIndex = 0;
@@ -51,6 +59,11 @@ class BarrageSimulator {
     // 模式标记
     this.showcaseMode = false;
     this.reviewMode = false;
+    this._denseMode = false;
+
+    // 密集模式定时器
+    this.denseGiftTimer = null;
+    this._denseTimers = [];
   }
 
   /**
@@ -73,6 +86,88 @@ class BarrageSimulator {
   }
 
   /**
+   * ==================== 密集展示模式 ====================
+   * 宣传视频录制专用：快速填满阵型 + 大量礼物单位召唤
+   *
+   * Phase 1 [0~5s]  快速入场
+   *   - 100人快速加入（左右各50，每50ms加1人）
+   *
+   * Phase 2 [5s起]  持续高频送礼（循环不停）
+   *   - 每500ms随机一个玩家送一个礼物
+   *   - 礼物按权重循环：tier1×2, tier2×2, tier3, tier4, tier5, tier6
+   *   - 效果：快速召唤大量礼物单位，展示满屏效果
+   */
+  startDenseShowcase() {
+    if (this.enabled) this.stop();
+    this.enabled = true;
+    this.showcaseMode = false;
+    this.reviewMode = false;
+    this._denseMode = true;
+    this._denseTimers = [];
+    this.giftCycleIndex = 0;
+
+    console.log('[SIM] ===== 密集展示模式启动（宣传片录制用）=====');
+    console.log('[SIM] Phase 1: 100人快速入场 (50ms/人, 约5秒完成)');
+    console.log('[SIM] Phase 2: 持续送礼 (500ms/个, 混合tier1~6)');
+
+    // Phase 1: 100 players join (left/right alternating, 50ms each)
+    for (let i = 0; i < 100; i++) {
+      const camp = i % 2 === 0 ? 'left' : 'right';
+      const t = setTimeout(() => {
+        if (!this.enabled || !this._denseMode) return;
+        this._simulateJoinCamp(camp);
+      }, i * 50);
+      this._denseTimers.push(t);
+    }
+
+    // Phase 2: Start dense gifting after 5.5s
+    const phase2Timer = setTimeout(() => {
+      if (!this.enabled || !this._denseMode) return;
+      console.log('[SIM-密集] Phase 2: 开始持续高频送礼');
+      this._startDenseGiftLoop();
+    }, 5500);
+    this._denseTimers.push(phase2Timer);
+  }
+
+  /**
+   * 密集送礼循环 — 每500ms随机送一个礼物（tier1~6加权循环）
+   */
+  _startDenseGiftLoop() {
+    if (!this.enabled || !this._denseMode) return;
+
+    // 加权礼物池：低tier更多（基础单位多）+ 少量高tier（精英单位点缀）
+    const weightedGifts = [
+      'fairy_wand', 'fairy_wand',       // tier1 ×2
+      'ability_pill', 'ability_pill',   // tier2 ×2
+      'donut',                          // tier3
+      'battery',                        // tier4
+      'love_blast',                     // tier5
+      'mystery_drop',                   // tier6
+    ];
+
+    const sendNext = () => {
+      if (!this.enabled || !this._denseMode) return;
+      if (this.gameEngine.state !== 'running') {
+        this.denseGiftTimer = setTimeout(sendNext, 500);
+        return;
+      }
+
+      const player = this.playerManager.getRandomPlayer();
+      if (player) {
+        const giftId = weightedGifts[this.giftCycleIndex % weightedGifts.length];
+        this.giftCycleIndex++;
+        const gift = getGift(giftId);
+        console.log(`[SIM-密集] ${player.name}(${player.camp}) 送 ${gift?.name || giftId}`);
+        this.processGift(player.id, player.name, player.camp, giftId, 1);
+      }
+
+      this.denseGiftTimer = setTimeout(sendNext, 500);
+    };
+
+    sendNext();
+  }
+
+  /**
    * 默认模拟模式：
    * - 先加入6个玩家（左右各3）
    * - 然后每3~5秒轮流送1个礼物（从仙女棒到神秘空投循环）
@@ -84,6 +179,7 @@ class BarrageSimulator {
     this.showcaseMode = false;
     this.reviewMode = false;
     this.giftCycleIndex = 0;
+    this.maxJoinCount = 40; // 模拟模式最多40人加入（两侧各~20），避免整局不停弹通知
     console.log('[SIM] 弹幕模拟器已开启（轮流送礼模式：3~5秒间隔，低→高循环）');
 
     // 先加入6个玩家
@@ -124,8 +220,8 @@ class BarrageSimulator {
    * 时间线（约2.5分钟完成所有功能展示，之后持续运行直到对局结束）：
    *
    * Phase 1 [0~15s]  玩家入场
-   *   - 快速加入20个玩家(左右各10)，展示入场通知
-   *   - 每0.6秒加入1个，展示加入动画和阵营分配
+   *   - 快速加入300个玩家(左右各150)，性能压测
+   *   - 每50ms加入1个，约15秒完成
    *
    * Phase 2 [15~45s] 6种礼物逐一展示
    *   - 每种礼物间隔4秒，从tier1仙女棒到tier6神秘空投
@@ -158,7 +254,7 @@ class BarrageSimulator {
 
     console.log('[SIM] ===== 审核演示模式启动 =====');
     console.log(`[SIM] 偏向阵营: ${this._reviewBiasCamp} (${this._reviewBiasRatio * 100}%礼物偏向)`);
-    console.log('[SIM] 时间线: P1入场(0~15s) → P2礼物展示(15~45s) → P3升级(45~75s) → P4指令(75~95s) → P5混合互动(95s+)');
+    console.log('[SIM] 时间线: P1入场300人(0~15s) → P2礼物展示(15~45s) → P3升级(45~75s) → P4指令(75~95s) → P5混合互动(95s+)');
 
     this._buildReviewTimeline();
   }
@@ -179,12 +275,12 @@ class BarrageSimulator {
 
     let t = 0; // 累计时间(ms)
 
-    // ========== Phase 1: 玩家入场 [0~15s] ==========
-    console.log('[SIM-审核] Phase 1: 玩家入场（20人，每0.6秒1人）');
-    for (let i = 0; i < 20; i++) {
+    // ========== Phase 1: 玩家入场 [0~15s] — 150人/侧，共300人 ==========
+    console.log('[SIM-审核] Phase 1: 玩家入场（300人，每50ms 1人，约15秒完成）');
+    for (let i = 0; i < 300; i++) {
       const camp = i % 2 === 0 ? 'left' : 'right';
       schedule(t, () => this._simulateJoinCamp(camp), `P1: 玩家${i + 1}加入${camp}阵营`);
-      t += 600;
+      t += 50;
     }
 
     // ========== Phase 2: 6种礼物逐一展示 [15~45s] ==========
@@ -364,6 +460,8 @@ class BarrageSimulator {
 
     const loop = () => {
       if (!this.enabled || !this.reviewMode) return;
+      // 达到上限后停止
+      if (this.maxJoinCount && this.playerManager.players.size >= this.maxJoinCount) return;
       if (this.gameEngine.state === 'running') {
         this._simulateJoin();
       }
@@ -396,7 +494,7 @@ class BarrageSimulator {
     const result = this.playerManager.joinCamp(picked.id, picked.name, avatarUrl, camp);
     if (result.success) {
       this.gameEngine.addForce(camp, 10);
-      this.playerManager.addContribution(picked.id, 10);
+      this.playerManager.addContribution(picked.id, 10, 0, 'join');
 
       const vipInfo = this.playerManager.getVipInfo(picked.id);
       this.broadcast({
@@ -428,19 +526,28 @@ class BarrageSimulator {
     this.enabled = false;
     this.showcaseMode = false;
     this.reviewMode = false;
+    this._denseMode = false;
     if (this.joinTimer) clearTimeout(this.joinTimer);
     if (this.giftTimer) clearTimeout(this.giftTimer);
     if (this.showcaseTimer) clearTimeout(this.showcaseTimer);
     if (this.reviewTimer) clearTimeout(this.reviewTimer);
+    if (this.denseGiftTimer) clearTimeout(this.denseGiftTimer);
     this.joinTimer = null;
     this.giftTimer = null;
     this.showcaseTimer = null;
     this.reviewTimer = null;
+    this.denseGiftTimer = null;
 
     // 清理审核模式的所有定时器
     if (this._reviewTimers) {
       for (const t of this._reviewTimers) clearTimeout(t);
       this._reviewTimers = [];
+    }
+
+    // 清理密集模式的所有定时器
+    if (this._denseTimers) {
+      for (const t of this._denseTimers) clearTimeout(t);
+      this._denseTimers = [];
     }
 
     console.log('[SIM] 弹幕模拟器已关闭');
@@ -511,7 +618,12 @@ class BarrageSimulator {
 
   _scheduleJoin() {
     if (!this.enabled || this.reviewMode) return;
+    // 达到上限后停止调度，避免整局不停弹加入通知
+    const currentCount = this.playerManager.players.size;
+    if (this.maxJoinCount && currentCount >= this.maxJoinCount) return;
     this.joinTimer = setTimeout(() => {
+      // 达到上限检查
+      if (this.maxJoinCount && this.playerManager.players.size >= this.maxJoinCount) return;
       // 默认模式下缓慢加入（30%概率，每2秒）
       if (this.gameEngine.state === 'running' && Math.random() < 0.3) {
         this._simulateJoin();
@@ -539,7 +651,7 @@ class BarrageSimulator {
     if (result.success) {
       // 加入时给一个基础推力
       this.gameEngine.addForce(camp, 10);
-      this.playerManager.addContribution(playerId, 10);
+      this.playerManager.addContribution(playerId, 10, 0, 'join');
 
       const vipInfo = this.playerManager.getVipInfo(playerId);
       this.broadcast({

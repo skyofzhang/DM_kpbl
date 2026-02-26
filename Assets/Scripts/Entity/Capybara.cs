@@ -71,6 +71,11 @@ namespace CapybaraDuel.Entity
         /// <summary>是否正在向橘子方向前进（供FootDustManager判断）</summary>
         public bool IsAdvancing { get; private set; }
 
+        // === 性能优化：预分配物理查询缓冲区，消除OverlapSphere每帧GC分配 ===
+        private static readonly Collider[] _overlapBuffer = new Collider[64];
+        // === 性能优化：缓存Renderer数组，避免OnEnable每次GetComponentsInChildren ===
+        private Renderer[] _cachedRenderers;
+
         // 动态阵型：按阵营维护存活单位列表，每帧根据列表索引排列
         private static readonly List<Capybara> _leftAlive = new List<Capybara>();
         private static readonly List<Capybara> _rightAlive = new List<Capybara>();
@@ -174,9 +179,13 @@ namespace CapybaraDuel.Entity
             _stableSpawnOrder = _spawnOrder;
             // 贡献值 = 推力值（gift单位越贵推力越高，排前面）
             ContributionValue = force;
-            // 新单位入场渐进期：先在末位，N秒后才参与前排排序
+            // 视觉效果：根据 tier 等级应用缩放+发光+颜色
+            int tierInt = VFX.UnitVisualEffect.ParseTier(tier);
+
+            // 新单位入场渐进期：默认单位先在末位，N秒后才参与前排排序
+            // v117: 礼物单位(tier>0)跳过渐进期，立即按贡献值排到正确位置，避免穿越阵型
             _spawnArrivalTime = Time.time;
-            _hasSettled = false;
+            _hasSettled = (tierInt > 0);
             // 加入阵营存活列表（动态阵型用）
             var aliveList = (camp == Camp.Left) ? _leftAlive : _rightAlive;
             if (!aliveList.Contains(this))
@@ -188,9 +197,6 @@ namespace CapybaraDuel.Entity
                 _animator = GetComponent<Animator>();
                 CacheAnimatorParams();
             }
-
-            // 视觉效果：根据 tier 等级应用缩放+发光+颜色
-            int tierInt = VFX.UnitVisualEffect.ParseTier(tier);
             _currentTier = tierInt;
             var visualEffect = GetComponent<VFX.UnitVisualEffect>();
             if (visualEffect != null)
@@ -336,15 +342,12 @@ namespace CapybaraDuel.Entity
                 IsAdvancing = dx < -0.001f; // 右阵营向左(-X)是前进
             _prevFramePos = transform.position;
 
-            // 头顶HUD：世界Y轴持续自转 + 朝相机倾斜（从俯视角能清晰看到头像旋转）
+            // 头顶HUD：Billboard — 始终朝向主摄像机（v119: 修复侧面对相机导致头像不可见问题）
             if (_hudRoot != null)
             {
-                // 累加式旋转（避免Time.time过大时精度丢失）
-                _hudYAngle += HUD_ROTATE_SPEED * Time.deltaTime;
-                if (_hudYAngle > 360f) _hudYAngle -= 360f;
-
-                // 世界空间旋转：先倾斜朝上（让俯视相机看到正面），再绕Y轴自转
-                _hudRoot.rotation = Quaternion.Euler(HUD_TILT_ANGLE, _hudYAngle, 0f);
+                if (_mainCam == null) _mainCam = Camera.main;
+                if (_mainCam != null)
+                    _hudRoot.rotation = _mainCam.transform.rotation;
             }
         }
 
@@ -461,10 +464,16 @@ namespace CapybaraDuel.Entity
                 _smoothFormationX = idealX;
                 _smoothFormationZ = targetZ;
                 _hasFormationTarget = true;
+                // v117: 礼物单位(已settle)直接到位，不从spawn边缘穿越阵型
+                if (_hasSettled)
+                {
+                    pos.x = idealX;
+                    pos.z = targetZ;
+                }
             }
             else
             {
-                float trackSpeed = 1.5f * Time.deltaTime;
+                float trackSpeed = 3.0f * Time.deltaTime; // v116: 1.5→3.0 更快回位到阵型目标
                 _smoothFormationX = Mathf.Lerp(_smoothFormationX, idealX, trackSpeed);
                 _smoothFormationZ = Mathf.Lerp(_smoothFormationZ, targetZ, trackSpeed);
             }
@@ -492,7 +501,7 @@ namespace CapybaraDuel.Entity
             }
 
             // Z轴平滑移动
-            pos.z = Mathf.Lerp(pos.z, _smoothFormationZ, retreatLerpSpeed * 0.6f * Time.deltaTime);
+            pos.z = Mathf.Lerp(pos.z, _smoothFormationZ, retreatLerpSpeed * 1.0f * Time.deltaTime); // v116: 0.6→1.0 Z轴匀速回位不打折
 
             // 硬约束：不越过 boundary
             if (camp == Camp.Left && pos.x > boundaryX)
@@ -516,13 +525,15 @@ namespace CapybaraDuel.Entity
             float scaleFactor = Mathf.Max(_targetScale, 1f);
             // 检测范围：适度放大（降低大单位的扩大倍率，防止过远检测）
             float effectiveRadius = separationRadius * Mathf.Lerp(1f, scaleFactor, 0.6f) * 1.2f;
-            var colliders = Physics.OverlapSphere(transform.position, effectiveRadius);
+            // 性能优化：NonAlloc版本，零GC分配（原OverlapSphere每帧400次GC）
+            int hitCount = Physics.OverlapSphereNonAlloc(transform.position, effectiveRadius, _overlapBuffer);
             float zSeparation = 0f;
             int neighborCount = 0;
 
-            foreach (var col in colliders)
+            for (int i = 0; i < hitCount; i++)
             {
-                if (col.gameObject == gameObject) continue;
+                var col = _overlapBuffer[i];
+                if (col == null || col.gameObject == gameObject) continue;
                 var otherCapy = col.GetComponent<Capybara>();
                 if (otherCapy == null) continue;
 
@@ -555,16 +566,16 @@ namespace CapybaraDuel.Entity
                 float avgSep = zSeparation / neighborCount;
                 // 分离力：不再按scaleFactor线性放大，用sqrt缓和
                 float effectiveForce = separationForce * Mathf.Sqrt(scaleFactor);
-                float crowdBoost = Mathf.Min(neighborCount, 5) * 0.2f + 0.8f;
+                float crowdBoost = Mathf.Min(neighborCount, 3) * 0.1f + 0.9f; // v116: max 1.2×(原1.8×) 减少拥挤放大
                 float delta = avgSep * effectiveForce * crowdBoost * Time.deltaTime;
                 // 限制单帧偏移量，防止一次被弹太远
-                delta = Mathf.Clamp(delta, -0.5f, 0.5f);
+                delta = Mathf.Clamp(delta, -0.2f, 0.2f); // v116: ±0.5→±0.2 单帧漂移减半
                 _smoothFormationZ += delta;
             }
 
             // 回弹机制：如果分离力把目标Z推得太远（超出zSpreadMax×0.8），逐步拉回
             // 防止小单位被弹到阵型外缘后永远回不来
-            float maxDeviation = zSpreadMax * 0.8f;
+            float maxDeviation = zSpreadMax * 0.6f; // v116: 0.8→0.6 更早拉回，阵型更紧凑
             if (Mathf.Abs(_smoothFormationZ) > maxDeviation)
             {
                 float excess = Mathf.Abs(_smoothFormationZ) - maxDeviation;
@@ -641,8 +652,10 @@ namespace CapybaraDuel.Entity
         /// </summary>
         private void ClearAllPropertyBlocks()
         {
-            var renderers = GetComponentsInChildren<Renderer>();
-            foreach (var r in renderers)
+            // 性能优化：使用缓存的Renderer数组（首次时缓存，避免每次OnEnable分配）
+            if (_cachedRenderers == null)
+                _cachedRenderers = GetComponentsInChildren<Renderer>();
+            foreach (var r in _cachedRenderers)
             {
                 if (r == null) continue;
                 if (r is MeshRenderer || r is SkinnedMeshRenderer)

@@ -30,6 +30,14 @@ namespace CapybaraDuel.UI
             Instance = this;
             EnsureComponents();
             HideVisual();
+
+            // 公告层级：高于通知(20)和礼物(30)，低于结算(100)
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 90;
+            if (GetComponent<GraphicRaycaster>() == null)
+                gameObject.AddComponent<GraphicRaycaster>();
         }
 
         private void OnEnable()
@@ -134,20 +142,155 @@ namespace CapybaraDuel.UI
         {
             // 先弹出获胜公告，延迟后再让结算面板显示
             string winner = data.winner;
-            string campName = winner == "left" ? "香橙" : winner == "right" ? "柚子" : "";
+            string campName = winner == "left" ? "\u9999\u6a59" : winner == "right" ? "\u67da\u5b50" : "";
             Color color = winner == "left"
                 ? new Color(1f, 0.55f, 0f)      // 橙色
                 : new Color(0.68f, 1f, 0.18f);  // 绿色
 
             if (winner == "draw")
             {
-                ShowAnnouncement("比赛结束", "平局！", Color.white, 4.0f);
+                ShowAnnouncement("\u6bd4\u8d5b\u7ed3\u675f", "\u5e73\u5c40\uff01", Color.white, 4.0f);
             }
             else
             {
-                string reason = data.reason == "reached_end" ? "推到终点！" : "时间到！";
-                ShowAnnouncement($"恭喜 {campName}阵营 获胜！", reason, color, 4.0f);
+                string reason = data.reason == "reached_end" ? "\u63a8\u5230\u7ec8\u70b9\uff01" : "\u65f6\u95f4\u5230\uff01";
+                // 增强版胜利公告：大符号 + 阵营名 + 胜利
+                string victorySymbol = winner == "left" ? "\u2605\u25c6\u2605" : "\u2605\u25c6\u2605"; // ★◆★
+                ShowVictoryAnnouncement($"{victorySymbol} {campName}\u9635\u8425 \u80dc\u5229 {victorySymbol}", reason, color, 4.5f);
             }
+        }
+
+        /// <summary>增强版胜利公告：抖动+描边发光+扫光+呼吸缩放</summary>
+        public void ShowVictoryAnnouncement(string main, string sub, Color color, float duration)
+        {
+            if (_currentAnnouncement != null)
+                StopCoroutine(_currentAnnouncement);
+            _currentAnnouncement = StartCoroutine(VictoryAnnouncementRoutine(main, sub, color, duration));
+        }
+
+        private IEnumerator VictoryAnnouncementRoutine(string main, string sub, Color color, float duration)
+        {
+            var chineseFont = Resources.Load<TMP_FontAsset>("Fonts/ChineseFont SDF");
+            if (chineseFont != null)
+            {
+                if (mainText != null && mainText.font != chineseFont)
+                    mainText.font = chineseFont;
+                if (subText != null && subText.font != chineseFont)
+                    subText.font = chineseFont;
+            }
+
+            // 设置内容 - 大字体
+            if (mainText != null)
+            {
+                mainText.text = main;
+                mainText.color = color;
+                mainText.fontSize = 96; // 比普通公告更大
+                mainText.fontStyle = FontStyles.Bold;
+                // 加强描边
+                mainText.outlineWidth = 0.5f;
+                mainText.outlineColor = new Color32(0, 0, 0, 255);
+                // 发光投影 — v118: 降低Dilate/Softness，防止文字膨胀错乱
+                mainText.ForceMeshUpdate();
+                var mat = mainText.fontMaterial;
+                if (mat != null)
+                {
+                    mat.EnableKeyword("UNDERLAY_ON");
+                    mat.SetColor("_UnderlayColor", new Color(color.r, color.g, color.b, 0.5f));
+                    mat.SetFloat("_UnderlayOffsetX", 0f);
+                    mat.SetFloat("_UnderlayOffsetY", 0f);
+                    mat.SetFloat("_UnderlayDilate", 0.3f);
+                    mat.SetFloat("_UnderlaySoftness", 0.3f);
+                }
+            }
+            if (subText != null)
+            {
+                subText.text = sub;
+                subText.color = Color.white;
+                subText.fontSize = 42;
+            }
+
+            // === Phase 1: 弹入 + 抖动 (0.5s) ===
+            if (canvasGroup)
+            {
+                canvasGroup.blocksRaycasts = true;
+                canvasGroup.interactable = true;
+            }
+
+            float t = 0;
+            float enterDuration = 0.4f;
+            while (t < enterDuration)
+            {
+                t += Time.deltaTime;
+                float p = Mathf.Clamp01(t / enterDuration);
+                if (canvasGroup) canvasGroup.alpha = p;
+
+                // 从2倍缩小到1倍 + 弹性过冲
+                float eased = 1f + 2.7f * Mathf.Pow(p - 1f, 3f) + 1.7f * Mathf.Pow(p - 1f, 2f);
+                float scale = Mathf.Lerp(2.5f, 1f, eased);
+                if (mainText) mainText.transform.localScale = Vector3.one * scale;
+                yield return null;
+            }
+            if (canvasGroup) canvasGroup.alpha = 1;
+
+            // === Phase 2: 着陆抖动 (0.5s) ===
+            float shakeDuration = 0.5f;
+            float shakeIntensity = 12f;
+            t = 0;
+            Vector3 basePos = mainText != null ? mainText.transform.localPosition : Vector3.zero;
+            while (t < shakeDuration)
+            {
+                t += Time.deltaTime;
+                float decay = 1f - (t / shakeDuration);
+                decay *= decay; // 加速衰减
+                float shakeX = Random.Range(-shakeIntensity, shakeIntensity) * decay;
+                float shakeY = Random.Range(-shakeIntensity * 0.6f, shakeIntensity * 0.6f) * decay;
+                if (mainText) mainText.transform.localPosition = basePos + new Vector3(shakeX, shakeY, 0);
+                yield return null;
+            }
+            if (mainText)
+            {
+                mainText.transform.localPosition = basePos;
+                mainText.transform.localScale = Vector3.one;
+            }
+
+            // === Phase 3: 呼吸缩放 + 停留 ===
+            float stayDuration = duration - enterDuration - shakeDuration - fadeOutDuration;
+            t = 0;
+            while (t < stayDuration)
+            {
+                t += Time.deltaTime;
+                // 微呼吸缩放（增加仪式感）
+                float breathScale = 1f + Mathf.Sin(t * 3f) * 0.04f;
+                if (mainText) mainText.transform.localScale = Vector3.one * breathScale;
+                yield return null;
+            }
+
+            // === Phase 4: 淡出 + 重置材质 ===
+            if (mainText)
+            {
+                mainText.transform.localScale = Vector3.one;
+                mainText.fontSize = 72; // 恢复默认字号
+                // v118: 重置underlay参数，防止污染后续公告文字
+                var matReset = mainText.fontMaterial;
+                if (matReset != null)
+                {
+                    matReset.SetFloat("_UnderlayDilate", 0.1f);
+                    matReset.SetFloat("_UnderlaySoftness", 0.2f);
+                    matReset.SetFloat("_UnderlayOffsetX", 0.5f);
+                    matReset.SetFloat("_UnderlayOffsetY", -0.5f);
+                    matReset.SetColor("_UnderlayColor", new Color(0, 0, 0, 0.6f));
+                }
+            }
+            t = 0;
+            while (t < fadeOutDuration)
+            {
+                t += Time.deltaTime;
+                if (canvasGroup) canvasGroup.alpha = Mathf.Lerp(1, 0, t / fadeOutDuration);
+                yield return null;
+            }
+
+            HideVisual();
+            _currentAnnouncement = null;
         }
 
         /// <summary>

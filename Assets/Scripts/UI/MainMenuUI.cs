@@ -120,7 +120,7 @@ namespace CapybaraDuel.UI
         /// </summary>
         private void Update()
         {
-            // 组合按键: Ctrl + Shift + D
+            // 组合按键: Ctrl + Shift + D → 审核演示模式
             if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.LeftShift)
                 && Input.GetKeyDown(KeyCode.D))
             {
@@ -140,6 +140,26 @@ namespace CapybaraDuel.UI
 
                 StartReviewDemo();
             }
+
+            // 组合按键: Ctrl + Shift + V → 密集展示模式（宣传片录制专用）
+            if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.LeftShift)
+                && Input.GetKeyDown(KeyCode.V))
+            {
+                Debug.Log("[MainMenuUI] ★ 密集展示模式启动 (Ctrl+Shift+V) — 宣传片录制专用");
+                var net = NetworkManager.Instance;
+
+                if (net == null || !net.IsConnected)
+                {
+                    if (net != null)
+                    {
+                        net.OnConnected += OnConnectedThenDenseShowcase;
+                        net.Connect();
+                    }
+                    return;
+                }
+
+                StartDenseShowcase();
+            }
         }
 
         private void OnConnectedThenReviewDemo()
@@ -158,6 +178,28 @@ namespace CapybaraDuel.UI
 
             GameManager.Instance?.RequestStartGame();
             GameManager.Instance?.RequestReviewSim();
+
+            var uiMgr = UIManager.Instance;
+            if (uiMgr != null)
+                uiMgr.ShowGameUI();
+        }
+
+        private void OnConnectedThenDenseShowcase()
+        {
+            var net = NetworkManager.Instance;
+            if (net != null)
+                net.OnConnected -= OnConnectedThenDenseShowcase;
+            StartDenseShowcase();
+        }
+
+        private void StartDenseShowcase()
+        {
+            // 先重置旧房间状态
+            GameManager.Instance?.ResetGame();
+            GameManager.Instance?.RequestResetGame();
+
+            GameManager.Instance?.RequestStartGame();
+            GameManager.Instance?.RequestDenseSim();
 
             var uiMgr = UIManager.Instance;
             if (uiMgr != null)

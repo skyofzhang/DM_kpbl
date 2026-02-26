@@ -29,7 +29,7 @@ namespace CapybaraDuel.VFX
         [SerializeField] private float particleSpeed = 1.2f;
 
         [Header("Colors")]
-        [SerializeField] private Color dustColor = new Color(0.75f, 0.65f, 0.5f, 0.5f);
+        [SerializeField] private Color dustColor = new Color(0.92f, 0.9f, 0.85f, 0.4f); // 偏白色烟雾（地板上轻薄）
 
         [Header("Material (必须预设, Shader.Find在Build中不可用)")]
         [Tooltip("URP Particles/Unlit 透明材质，由SceneUpdater自动wire")]
@@ -85,13 +85,14 @@ namespace CapybaraDuel.VFX
             var gradient = new Gradient();
             gradient.SetKeys(
                 new[] {
-                    new GradientColorKey(dustColor, 0f),
-                    new GradientColorKey(dustColor, 1f)
+                    new GradientColorKey(new Color(1f, 1f, 0.98f), 0f),      // 开始近白色
+                    new GradientColorKey(new Color(0.95f, 0.88f, 0.75f), 0.4f), // 中段微暖黄
+                    new GradientColorKey(new Color(0.85f, 0.82f, 0.75f), 1f)  // 结尾淡灰黄
                 },
                 new[] {
                     new GradientAlphaKey(0f, 0f),
                     new GradientAlphaKey(dustColor.a, 0.1f),
-                    new GradientAlphaKey(dustColor.a * 0.3f, 0.5f),
+                    new GradientAlphaKey(dustColor.a * 0.25f, 0.5f),
                     new GradientAlphaKey(0f, 1f)
                 }
             );

@@ -3,7 +3,12 @@ guid: 623ca7c5a3b2c574ba3fa27d4a24e1fb
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: tripo_mat_1f99a927
+    second: {fileID: 2100000, guid: 0c1d67a06dc3d7848b8e2c2fedf709db, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

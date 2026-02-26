@@ -32,9 +32,9 @@ class GameEngine {
 
     // 速度驱动参数（每200ms为1tick）
     // 最大速度: 0.21单位/tick → 到终点最少 100/0.21/5 ≈ 95秒（碾压局）
-    // 最小可感知速度: 0.018单位/tick → 到终点需 100/0.018/5 ≈ 1111秒（势均力敌）
-    this.maxSpeedPerTick = 0.21;     // 每tick最大位移（硬上限）— 从0.3再降30%
-    this.minSpeedPerTick = 0.018;    // 最小可感知速度 — 从0.025再降30%
+    // 最小可感知速度: 0.04单位/tick → HUD显示≥0.10m/s（不再出现0.00/0.01）
+    this.maxSpeedPerTick = 0.21;     // 每tick最大位移（硬上限）
+    this.minSpeedPerTick = 0.04;     // 最小可感知速度 — 从0.018提升确保HUD有意义
     this.speedSmoothFactor = 0.15;   // 速度变化平滑（0~1，越小越平滑）
 
     // 当前速度（平滑过渡用）
@@ -135,8 +135,8 @@ class GameEngine {
     // 解决高推力拉锯时(如5万vs5万+1000)橘子卡住不动的问题
     if (absDiff > 0) {
       // 基于绝对差值的保底速度（对数缩放，避免线性爆炸）
-      // absDiff=100 → 0.003, absDiff=1000 → 0.006, absDiff=10000 → 0.008
-      const floorSpeed = Math.min(this.minSpeedPerTick * 0.5, Math.log10(absDiff + 1) * 0.002);
+      // absDiff=100 → 0.012, absDiff=1000 → 0.018, absDiff=5000 → 0.022
+      const floorSpeed = Math.min(this.minSpeedPerTick * 0.6, Math.log10(absDiff + 1) * 0.006);
       absSpeed = Math.max(absSpeed, floorSpeed);
     }
 

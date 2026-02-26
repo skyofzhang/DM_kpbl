@@ -66,7 +66,8 @@ class DouyinAPI {
 
     // msg_id去重: 防止抖音重复推送同一条消息
     this._seenMsgIds = new Map(); // msg_id -> timestamp
-    this._dedupeCleanupTimer = setInterval(() => this._cleanupSeenMsgIds(), 60000); // 每分钟清理
+    this._maxSeenMsgIds = 5000; // 性能优化：硬上限防止无限增长
+    this._dedupeCleanupTimer = setInterval(() => this._cleanupSeenMsgIds(), 30000); // 每30秒清理(原60s)
 
     // 统计
     this.stats = {
@@ -523,10 +524,9 @@ class DouyinAPI {
       case 'live_gift': {
         // payload item: { msg_id, sec_openid, sec_gift_id, gift_num, gift_value,
         //                  avatar_url, nickname, timestamp, test, audience_sec_open_id }
-        // test=true 表示测试/自查工具数据，需过滤
+        // test=true 表示测试/自查工具数据（审核环境也会带此标记，不能过滤）
         if (item.test === true) {
-          console.log(`[DouyinAPI] Filtered test gift from ${item.nickname}`);
-          return;
+          console.log(`[DouyinAPI] Test gift from ${item.nickname} (processing normally)`);
         }
         this.stats.totalGifts++;
         this.onGift(
@@ -702,6 +702,15 @@ class DouyinAPI {
     for (const [msgId, ts] of this._seenMsgIds.entries()) {
       if (ts < expireTime) {
         this._seenMsgIds.delete(msgId);
+        cleaned++;
+      }
+    }
+    // 性能优化：硬上限兜底，防止极端并发下Map无限增长
+    if (this._seenMsgIds.size > this._maxSeenMsgIds) {
+      const excess = this._seenMsgIds.size - this._maxSeenMsgIds;
+      const iter = this._seenMsgIds.keys();
+      for (let i = 0; i < excess; i++) {
+        this._seenMsgIds.delete(iter.next().value);
         cleaned++;
       }
     }

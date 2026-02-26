@@ -84,6 +84,16 @@ namespace CapybaraDuel.UI
                 cards[i].streakText = FindTMP(row, "PlayerStreak");
                 cards[i].rankText = FindTMP(row, "RankText");
 
+                // 强制放大字号，确保清晰可读
+                if (cards[i].nameText != null && cards[i].nameText.fontSize < 22f)
+                    cards[i].nameText.fontSize = 24f;
+                if (cards[i].forceText != null && cards[i].forceText.fontSize < 18f)
+                    cards[i].forceText.fontSize = 20f;
+                if (cards[i].streakText != null && cards[i].streakText.fontSize < 18f)
+                    cards[i].streakText.fontSize = 20f;
+                if (cards[i].rankText != null && cards[i].rankText.fontSize < 28f)
+                    cards[i].rankText.fontSize = 32f;
+
                 // 头像: AvatarContainer/PlayerAvatar
                 var avatarContainer = row.Find("AvatarContainer");
                 if (avatarContainer != null)

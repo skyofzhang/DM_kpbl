@@ -353,7 +353,7 @@ class Room {
       const boostForce = levelValues.boostForce;
       const boostDuration = 5; // 秒
       this.gameEngine.addTempForce(player.camp, boostForce, boostDuration);
-      this.playerManager.addContribution(secOpenId, boostForce, boostForce);
+      this.playerManager.addContribution(secOpenId, boostForce, boostForce, 'boost'); // v116: 666贡献上限5次/局
 
       // 广播推力升级事件（让客户端显示特效）
       this.broadcast({
@@ -380,7 +380,7 @@ class Room {
     const result = this.playerManager.joinCamp(secOpenId, nickname, avatarUrl, camp);
     if (result.success) {
       this.gameEngine.addForce(camp, 10); // 加入基础推力（永久）
-      this.playerManager.addContribution(secOpenId, 10, 10);
+      this.playerManager.addContribution(secOpenId, 10, 10, 'join'); // v116: 标记来源
 
       const vipInfo = this.playerManager.getVipInfo(secOpenId);
       this.broadcast({
@@ -478,7 +478,7 @@ class Room {
     const likeDuration = 3; // 秒
     const totalForce = likeNum * forcePerLike;
     this.gameEngine.addTempForce(player.camp, totalForce, likeDuration);
-    this.playerManager.addContribution(secOpenId, totalForce, totalForce);
+    this.playerManager.addContribution(secOpenId, totalForce, totalForce, 'like'); // v116: 点赞贡献上限10次/局
 
     // 广播点赞推力事件（让客户端显示提示）
     this.broadcast({
@@ -560,6 +560,8 @@ class Room {
         if (msg.data && msg.data.enabled) {
           if (msg.data.review) {
             this.simulator.startReviewDemo();
+          } else if (msg.data.dense) {
+            this.simulator.startDenseShowcase();
           } else if (msg.data.showcase) {
             this.simulator.startShowcase();
           } else {
@@ -582,7 +584,7 @@ class Room {
             const result = this.playerManager.joinCamp(msg.data.playerId, msg.data.playerName, '', camp);
             if (result.success) {
               this.gameEngine.addForce(camp, 10); // 加入基础推力（永久）
-              this.playerManager.addContribution(msg.data.playerId, 10, 10);
+              this.playerManager.addContribution(msg.data.playerId, 10, 10, 'join'); // v116: 标记来源
               const vipInfo3 = this.playerManager.getVipInfo(msg.data.playerId);
               this.broadcast({
                 type: 'player_joined',

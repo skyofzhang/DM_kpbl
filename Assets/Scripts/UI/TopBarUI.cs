@@ -93,6 +93,20 @@ namespace CapybaraDuel.UI
 
         private float _lastHintDiff = -1f;
 
+        // 动态进度条增强
+        private Image _barLeftImg;
+        private Image _barRightImg;
+        private Image _barDividerImg;
+        private GameObject _leftGlowEdge;
+        private GameObject _rightGlowEdge;
+        private float _shimmerPhase = 0f;
+
+        // 阵营色
+        private static readonly Color BAR_LEFT_BASE  = new Color(1f, 0.55f, 0.1f);    // 橙色
+        private static readonly Color BAR_RIGHT_BASE = new Color(0.35f, 0.85f, 0.2f); // 绿色
+        private static readonly Color BAR_LEFT_GLOW  = new Color(1f, 0.8f, 0.3f, 0.6f);
+        private static readonly Color BAR_RIGHT_GLOW = new Color(0.5f, 1f, 0.4f, 0.6f);
+
         private void OnEnable()
         {
             TrySubscribe();
@@ -109,6 +123,9 @@ namespace CapybaraDuel.UI
             _targetSplit = 0.5f;
             ApplyBarSplit(0.5f);
 
+            // 进度条视觉增强
+            EnhanceProgressBar();
+
             // 旧版兼容归零
             if (progressBarLeft) progressBarLeft.fillAmount = 0f;
             if (progressBarRight) progressBarRight.fillAmount = 0f;
@@ -119,6 +136,14 @@ namespace CapybaraDuel.UI
 
         private void EnsureLayout()
         {
+            // TopBar层级=50，重要数据始终可见（高于通知20和礼物30）
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 50;
+            if (GetComponent<GraphicRaycaster>() == null)
+                gameObject.AddComponent<GraphicRaycaster>();
+
             // 【重要】不再覆盖RectTransform位置！位置由场景设定，代码不动
             // 之前 rt.anchoredPosition = new Vector2(0, -100f) 会覆盖用户手动调整
 
@@ -188,6 +213,9 @@ namespace CapybaraDuel.UI
 
             // === 箭头脉冲动画 ===
             _arrowAnimTime += Time.deltaTime;
+
+            // === 进度条动态效果 ===
+            UpdateBarEffects();
         }
 
         private void LateUpdate()
@@ -202,6 +230,118 @@ namespace CapybaraDuel.UI
                 var gm = GameManager.Instance;
                 if (gm != null && gm.RemainingTime > 0)
                     HandleCountdown(gm.RemainingTime);
+            }
+        }
+
+        /// <summary>进度条视觉增强：设置阵营色+边框+发光边缘</summary>
+        private void EnhanceProgressBar()
+        {
+            // 获取进度条Image组件并设置阵营色（如果没有Image则添加）
+            if (barLeft != null)
+            {
+                _barLeftImg = barLeft.GetComponent<Image>();
+                if (_barLeftImg == null) _barLeftImg = barLeft.gameObject.AddComponent<Image>();
+                // 颜色完全交给材质Shader的GradientColor控制
+                // Image.color和材质_Color都设白色，避免多重乘法导致偏红/偏暗
+                _barLeftImg.color = Color.white;
+                if (_barLeftImg.material != null)
+                    _barLeftImg.material.SetColor("_Color", Color.white);
+                _barLeftImg.raycastTarget = false;
+            }
+            if (barRight != null)
+            {
+                _barRightImg = barRight.GetComponent<Image>();
+                if (_barRightImg == null) _barRightImg = barRight.gameObject.AddComponent<Image>();
+                _barRightImg.color = Color.white;
+                if (_barRightImg.material != null)
+                    _barRightImg.material.SetColor("_Color", Color.white);
+                _barRightImg.raycastTarget = false;
+            }
+            if (barDivider != null)
+            {
+                _barDividerImg = barDivider.GetComponent<Image>();
+                if (_barDividerImg == null) _barDividerImg = barDivider.gameObject.AddComponent<Image>();
+                _barDividerImg.color = Color.white;
+                _barDividerImg.raycastTarget = false;
+            }
+
+            // 为左侧条创建右边缘发光
+            if (barLeft != null && _leftGlowEdge == null)
+            {
+                _leftGlowEdge = new GameObject("LeftGlow", typeof(RectTransform));
+                _leftGlowEdge.transform.SetParent(barLeft, false);
+                var grt = _leftGlowEdge.GetComponent<RectTransform>();
+                grt.anchorMin = new Vector2(1f, 0f);
+                grt.anchorMax = new Vector2(1f, 1f);
+                grt.pivot = new Vector2(1f, 0.5f);
+                grt.sizeDelta = new Vector2(8f, 0f);
+                grt.anchoredPosition = Vector2.zero;
+                var gimg = _leftGlowEdge.AddComponent<Image>();
+                gimg.color = BAR_LEFT_GLOW;
+                gimg.raycastTarget = false;
+            }
+
+            // 为右侧条创建左边缘发光
+            if (barRight != null && _rightGlowEdge == null)
+            {
+                _rightGlowEdge = new GameObject("RightGlow", typeof(RectTransform));
+                _rightGlowEdge.transform.SetParent(barRight, false);
+                var grt = _rightGlowEdge.GetComponent<RectTransform>();
+                grt.anchorMin = new Vector2(0f, 0f);
+                grt.anchorMax = new Vector2(0f, 1f);
+                grt.pivot = new Vector2(0f, 0.5f);
+                grt.sizeDelta = new Vector2(8f, 0f);
+                grt.anchoredPosition = Vector2.zero;
+                var gimg = _rightGlowEdge.AddComponent<Image>();
+                gimg.color = BAR_RIGHT_GLOW;
+                gimg.raycastTarget = false;
+            }
+        }
+
+        /// <summary>进度条动态效果：边缘光脉冲+颜色亮度随进度</summary>
+        private void UpdateBarEffects()
+        {
+            _shimmerPhase += Time.deltaTime * 2.5f;
+            float pulse = 0.7f + 0.3f * Mathf.Sin(_shimmerPhase * Mathf.PI);
+
+            // 左侧进度越大（split越高），发光越亮
+            float leftProgress = Mathf.Clamp01(_currentSplit * 2f - 0.3f);   // 0.15~1映射
+            float rightProgress = Mathf.Clamp01((1f - _currentSplit) * 2f - 0.3f);
+
+            if (_leftGlowEdge != null)
+            {
+                var img = _leftGlowEdge.GetComponent<Image>();
+                if (img != null)
+                {
+                    float a = Mathf.Lerp(0.3f, 0.9f, leftProgress) * pulse;
+                    float w = Mathf.Lerp(4f, 14f, leftProgress);
+                    img.color = new Color(BAR_LEFT_GLOW.r, BAR_LEFT_GLOW.g, BAR_LEFT_GLOW.b, a);
+                    var grt = _leftGlowEdge.GetComponent<RectTransform>();
+                    grt.sizeDelta = new Vector2(w, 0f);
+                }
+            }
+
+            if (_rightGlowEdge != null)
+            {
+                var img = _rightGlowEdge.GetComponent<Image>();
+                if (img != null)
+                {
+                    float a = Mathf.Lerp(0.3f, 0.9f, rightProgress) * pulse;
+                    float w = Mathf.Lerp(4f, 14f, rightProgress);
+                    img.color = new Color(BAR_RIGHT_GLOW.r, BAR_RIGHT_GLOW.g, BAR_RIGHT_GLOW.b, a);
+                    var grt = _rightGlowEdge.GetComponent<RectTransform>();
+                    grt.sizeDelta = new Vector2(w, 0f);
+                }
+            }
+
+            // 进度条颜色由材质Shader控制（_PulseIntensity=0.08自带脉冲），
+            // 代码不再覆盖Image.color，保持白色让材质渐变正常显示
+
+            // 分割线脉冲白色
+            if (_barDividerImg != null)
+            {
+                float divAlpha = 0.8f + 0.2f * Mathf.Sin(_shimmerPhase * Mathf.PI * 1.5f);
+                _barDividerImg.color = new Color(1f, 1f, 1f, divAlpha);
             }
         }
 

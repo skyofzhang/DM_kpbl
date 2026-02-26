@@ -198,6 +198,13 @@ namespace CapybaraDuel.Core
             NetworkManager.Instance?.SendJson(json);
         }
 
+        /// <summary>密集展示模式：100人5秒入场 + 持续500ms/个高频送礼（宣传片录制专用）</summary>
+        public void RequestDenseSim()
+        {
+            var json = "{\"type\":\"toggle_sim\",\"data\":{\"enabled\":true,\"dense\":true}}";
+            NetworkManager.Instance?.SendJson(json);
+        }
+
         /// <summary>请求玩家数据面板（当前参与玩家完整数据）</summary>
         public void RequestPlayerDataPanel()
         {
@@ -430,7 +437,9 @@ namespace CapybaraDuel.Core
                 upgradeUI.ShowUpgrade(data.playerName, data.camp, data.newLevel, data.fairyWandCount);
             }
 
+            #if UNITY_EDITOR
             Debug.Log($"[GM] Player upgrade: {data.playerName} Lv.{data.oldLevel}→Lv.{data.newLevel} (仙女棒×{data.fairyWandCount})");
+            #endif
         }
 
         private void HandleGameState(GameStateData data)

@@ -55,6 +55,17 @@ namespace CapybaraDuel.UI
 
         private bool _layoutApplied = false;
 
+        private void EnsureCanvasSortOrder(int order)
+        {
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = order;
+            // Canvas需要GraphicRaycaster
+            if (GetComponent<GraphicRaycaster>() == null)
+                gameObject.AddComponent<GraphicRaycaster>();
+        }
+
         // 动态创建的排行榜头像（每行一个）
         private Image[] _leftRankAvatars;
         private Image[] _rightRankAvatars;
@@ -63,6 +74,9 @@ namespace CapybaraDuel.UI
 
         private void OnEnable()
         {
+            // 结算面板层级提升到最高（覆盖通知弹窗）
+            EnsureCanvasSortOrder(100);
+
             // 运行时排版保障：确保所有 TMP 位置和对齐正确
             if (!_layoutApplied)
             {
@@ -98,11 +112,13 @@ namespace CapybaraDuel.UI
 
         private void HandleGameEnded(GameEndedData data)
         {
+            #if UNITY_EDITOR
             Debug.Log($"[SettlementUI] Data received: winner={data.winner}, " +
                 $"mvp={(data.mvp != null ? data.mvp.playerName : "NULL")}, " +
                 $"leftRanks={(data.leftRankings?.Length ?? 0)}, " +
                 $"rightRanks={(data.rightRankings?.Length ?? 0)}, " +
                 $"scoreDist={(data.scoreDistribution?.Length ?? 0)}");
+            #endif
 
             gameObject.SetActive(true);
 

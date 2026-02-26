@@ -52,7 +52,7 @@ namespace CapybaraDuel.Core
         public static NetworkManager Instance { get; private set; }
 
         [Header("Server Config")]
-        public string serverUrl = "ws://212.64.26.65:8081";
+        public string serverUrl = "wss://kpbl.jiuqian2025.com";
         public float heartbeatInterval = 30f;
         public float reconnectDelay = 3f;
         public int maxReconnectAttempts = 3;

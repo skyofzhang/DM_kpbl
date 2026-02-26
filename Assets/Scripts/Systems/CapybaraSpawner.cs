@@ -43,6 +43,8 @@ namespace CapybaraDuel.Systems
         [SerializeField] private float spawnRangeZ = 5f;
         [Tooltip("随机从边缘入场（上/下/侧面），而不是固定从一个点")]
         [SerializeField] private bool randomEntryDirection = true;
+        [Tooltip("角色整体Y偏移（地板高度补偿，防穿模）")]
+        [SerializeField] private float characterYOffset = 0.2f;
 
         // 多Prefab池: key=poolTier (0=默认, 2~6=各tier专属)
         private Dictionary<int, Queue<GameObject>> pools = new Dictionary<int, Queue<GameObject>>();
@@ -178,6 +180,8 @@ namespace CapybaraDuel.Systems
                 float zOffset = Random.Range(-spawnRangeZ, spawnRangeZ);
                 spawnPos = spawnPoint.position + new Vector3(xOffset, 0, zOffset);
             }
+            // 地板高度补偿：所有角色整体抬高，防止穿模
+            spawnPos.y += characterYOffset;
             go.transform.position = spawnPos;
             go.SetActive(true);
 
@@ -280,7 +284,7 @@ namespace CapybaraDuel.Systems
                 z = -spawnRangeZ - Random.Range(1f, 3f);
             }
 
-            return new Vector3(x, basePos.y, z);
+            return new Vector3(x, basePos.y + characterYOffset, z);
         }
     }
 }
